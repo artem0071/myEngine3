@@ -11,9 +11,14 @@ class App
     public $status;
     public $page;
     public $param;
+    public $config;
 
+    public static function DB(){
+        $DBconfig = require 'config.php';
+        return new QueryBuilder(Connection::make($DBconfig['database']));
+    }
 
-    public function __construct($server)
+    public function __construct($server,$config)
     {
         $this->server = $server;
 
@@ -26,6 +31,8 @@ class App
         $this->param = (isset($urlMix[1]) ? $urlMix[1] : 'main');
 
         $this->userCookie = $_COOKIE;
+
+        $this->config = $config;
 
     }
 
