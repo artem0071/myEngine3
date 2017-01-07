@@ -1,0 +1,1 @@
+$selectelStorage = new SelectelStorage($config['selectel']['name'], $config['selectel']['pass']);

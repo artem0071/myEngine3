@@ -3,64 +3,108 @@
 
 class App
 {
-    public $server;
     public $url;
-    public $userCookie;
+    public $page;
+    public $param;
     public $login;
     public $pass;
     public $status;
-    public $page;
-    public $param;
-    public $config;
+    public $sysLang;
+    public $cookies;
+    public $server;
+
 
     public static function DB(){
-        $DBconfig = require 'config.php';
-        return new QueryBuilder(Connection::make($DBconfig['database']));
+        $config = require 'config.php';
+        return new QueryBuilder(Connection::make($config['database']));
     }
 
-    public function __construct($server,$config)
+    public function __construct($server)
     {
         $this->server = $server;
 
-        $this->url = trim(trim($server['REDIRECT_URL']),'/');
+        $this->url = trim($server['REQUEST_URI'],'/');
 
-        $urlMix = explode('/',$this->url);
+        $mixURL = explode('/',$this->url);
 
-        $this->page = ($urlMix[0] != '' ? $urlMix[0] : 'index');
+        $this->page = ($mixURL[0] != '' ? $mixURL[0] : 'artist');
+        $this->param = ((isset($mixURL[1]) && $mixURL[1] != '') ? $mixURL[1] : 'main');
 
-        $this->param = (isset($urlMix[1]) ? $urlMix[1] : 'main');
+        $this->sysLang = $server['HTTP_ACCEPT_LANGUAGE'];
 
-        $this->userCookie = $_COOKIE;
+    }
 
-        $this->config = $config;
+    public function render()
+    {
+
+        if (file_exists(MODULES.$this->sysLang.'.php'))
+            $word = require MODULES.'Lang/'.$this->sysLang.'.php';
+        else $word = require MODULES.'Lang/'.'ru.php';
+
+        myBootstrap::Header($this->page,$word);
+
+        $allowePages = array();
+
+        if ($this->checkUser()
+            || in_array($this->page,$allowePages)
+            || ($this->page == 'artist' && $this->param == 'toEnter'))
+        {
+            if (file_exists(CONTROLLERS.$this->page.'.php')){
+
+                $controller =  $this->page;
+                $method = $this->param;
+
+                $controller = new $controller();
+
+                if (method_exists($controller,$method)){
+
+                    $controller::$method($this,$word);
+
+                } else require VIEWS.'404.php';
+
+            } else require VIEWS.'404.php';
+
+        } else require VIEWS.'enter.php';
+
+        myBootstrap::Footer($this->page);
 
     }
 
     public function checkUser()
     {
 
-        return true;
+        if (isset($_SESSION['Login'])
+            || isset($_SESSION['Pass'])
+            || isset($_SESSION['Status']))
+        {
+
+            if (isset($_SESSION['Login'])
+                && isset($_SESSION['Pass'])
+                && isset($_SESSION['Status']))
+            {
+
+                $login = $_SESSION['Login'];
+                $pass = $_SESSION['Pass'];
+                $status = $_SESSION['Status'];
+
+                $User = App::DB()->select('Artists','*',"where `Artist_Login` = '{$login}' and `Artist_Pass` = '{$pass}' and `Artist_Status` = '{$status}'");
+
+                if (count($User) == 1) {
+
+                    $User = $User[0];
+
+                    $this->login = $User['Artist_Login'];
+                    $this->pass = $User['Artist_Pass'];
+                    $this->status = $User['Artist_Status'];
+
+                    return true;
+                }
+                else redirect('/artist/toExit');
+
+            } else redirect('/artist/toExit');
+
+        } return false;
+
     }
 
-    public function render()
-    {
-
-        if ($this->checkUser() || $this->page == 'enter') {
-
-            if (file_exists(CONTROLLERS . $this->page . '.php')) {
-
-                $controller = $this->page;
-                $method = $this->param;
-
-                $controller = new $controller;
-
-                if (method_exists($controller, $method))
-                    $controller::$method($this);
-
-                else require VIEWS.'404.php';
-
-            } else require VIEWS.'404.php';
-
-        } else redirect('/enter');
-    }
 }
